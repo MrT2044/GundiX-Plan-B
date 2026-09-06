@@ -247,7 +247,7 @@ def test_provenance_ignores_the_run_s_own_output(tmp_path: Path, monkeypatch) ->
             command, 0, stdout="?? artifacts/\n?? data/gundix.sqlite\n", stderr=""
         )
 
-    monkeypatch.setattr(artifacts_module.subprocess, "run", fake_run)
+    monkeypatch.setattr("gundix_contracts.artifacts.subprocess.run", fake_run)
     assert artifacts_module.git_commit(tmp_path) == "a" * 40
 
     def dirty_source(command, **_kwargs):
@@ -257,5 +257,5 @@ def test_provenance_ignores_the_run_s_own_output(tmp_path: Path, monkeypatch) ->
             command, 0, stdout=" M src/stream/decoder.py\n?? artifacts/\n", stderr=""
         )
 
-    monkeypatch.setattr(artifacts_module.subprocess, "run", dirty_source)
+    monkeypatch.setattr("gundix_contracts.artifacts.subprocess.run", dirty_source)
     assert artifacts_module.git_commit(tmp_path) == "UNCOMMITTED"
