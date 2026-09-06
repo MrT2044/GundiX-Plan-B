@@ -224,3 +224,38 @@ def test_an_empty_jsonl_artifact_is_valid(tmp_path: Path) -> None:
 def test_writing_leaves_no_temporary_file_behind(tmp_path: Path) -> None:
     _write_selection(tmp_path)
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_provenance_ignores_the_run_s_own_output(tmp_path: Path, monkeypatch) -> None:
+    """A run writing its artifacts must not thereby declare itself unreproducible.
+
+    Dirtiness is judged on the inputs - source, schemas, configuration - not on the outputs
+    the run just produced.
+    """
+    import subprocess
+
+    from gundix_contracts import artifacts as artifacts_module
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        if "rev-parse" in command:
+            return subprocess.CompletedProcess(command, 0, stdout="a" * 40 + "\n", stderr="")
+        # Only untracked output, exactly what a finished run leaves behind.
+        return subprocess.CompletedProcess(
+            command, 0, stdout="?? artifacts/\n?? data/gundix.sqlite\n", stderr=""
+        )
+
+    monkeypatch.setattr(artifacts_module.subprocess, "run", fake_run)
+    assert artifacts_module.git_commit(tmp_path) == "a" * 40
+
+    def dirty_source(command, **_kwargs):
+        if "rev-parse" in command:
+            return subprocess.CompletedProcess(command, 0, stdout="a" * 40 + "\n", stderr="")
+        return subprocess.CompletedProcess(
+            command, 0, stdout=" M src/stream/decoder.py\n?? artifacts/\n", stderr=""
+        )
+
+    monkeypatch.setattr(artifacts_module.subprocess, "run", dirty_source)
+    assert artifacts_module.git_commit(tmp_path) == "UNCOMMITTED"

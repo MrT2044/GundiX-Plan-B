@@ -84,12 +84,19 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+#: Paths whose state says nothing about how a run behaved: a run writes its own artifacts
+#: and its own database, so counting those as "dirty working tree" would mark every
+#: artifact unreproducible for the sole reason that it exists.
+_PROVENANCE_IGNORED_PREFIXES = ("artifacts/", "data/")
+
+
 def git_commit(repo_root: Path) -> str:
     """Real 40-char commit hash, or the explicit marker ``UNCOMMITTED``.
 
     A dirty working tree also yields ``UNCOMMITTED``: claiming a commit for code that is
     not in that commit would make the artifact unreproducible while looking reproducible,
-    which is worse than admitting it.
+    which is worse than admitting it. Dirtiness is judged on the *inputs* - source, schemas,
+    configuration - not on the outputs the run just wrote.
     """
     try:
         head = subprocess.run(
@@ -101,15 +108,21 @@ def git_commit(repo_root: Path) -> str:
         )
         if head.returncode != 0:
             return "UNCOMMITTED"
-        dirty = subprocess.run(
+        status = subprocess.run(
             ["git", "-C", str(repo_root), "status", "--porcelain"],
             capture_output=True,
             text=True,
             timeout=10,
             check=False,
         )
-        if dirty.returncode != 0 or dirty.stdout.strip():
+        if status.returncode != 0:
             return "UNCOMMITTED"
+        for line in status.stdout.splitlines():
+            path = line[3:].strip().strip('"')
+            if not path:
+                continue
+            if not path.startswith(_PROVENANCE_IGNORED_PREFIXES):
+                return "UNCOMMITTED"
         return head.stdout.strip()
     except (OSError, subprocess.SubprocessError):
         return "UNCOMMITTED"
