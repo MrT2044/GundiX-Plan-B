@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gundix.local/schemas/common.schema.json",
+  "title": "GundiX shared primitive types",
+  "description": "Materialisation of 03_S0_INTEGRATIONSVERTRAG section 3 (numbers, time, identifiers).",
+  "$defs": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semver per schema. Readers reject unknown MAJOR fail-closed; an unknown MINOR is accepted and logged."
+    },
+    "chain": { "type": "string", "const": "solana" },
+    "solana_address": {
+      "type": "string",
+      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+      "description": "Base58 public key. Case sensitive, never shortened, never a display name."
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[1-9A-HJ-NP-Za-km-z]{86,88}$",
+      "description": "Base58 transaction signature (64 bytes)."
+    },
+    "raw_amount": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "description": "Non-negative integer in the token's smallest unit, as a decimal string. Direction comes from `side`, never from a sign. Never a JSON number: above 2^53 many parsers lose precision."
+    },
+    "signed_decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+      "description": "Exact decimal as a string. Never a binary float."
+    },
+    "unsigned_decimal": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    },
+    "utc_second": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "description": "ISO-8601 UTC, second precision. Used for block times, which the chain only provides to the second."
+    },
+    "utc_millis": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "description": "ISO-8601 UTC, millisecond precision. Used for everything our own system observes or decides."
+    },
+    "sha256_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "git_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "semver": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "decimals": { "type": "integer", "minimum": 0, "maximum": 18 },
+    "slot": { "type": "integer", "minimum": 0 },
+    "bps": { "type": "integer", "minimum": 0, "maximum": 100000 },
+    "instruction_path": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)*$",
+      "description": "Dot separated instruction indices. For an aggregated router swap it is the path of the OUTERMOST instruction enclosing the whole route (S0 4.1.2)."
+    },
+    "venue": {
+      "type": "string",
+      "enum": [
+        "PUMP_FUN",
+        "PUMPSWAP",
+        "RAYDIUM_AMM_V4",
+        "RAYDIUM_CPMM",
+        "RAYDIUM_CLMM",
+        "RAYDIUM_LAUNCHLAB",
+        "METEORA_DLMM",
+        "METEORA_DAMM",
+        "ORCA_WHIRLPOOL",
+        "UNKNOWN"
+      ],
+      "description": "S0 4.1.5. Extending this enum is a CCR."
+    },
+    "router_label": {
+      "type": "string",
+      "enum": ["JUPITER_V6", "JUPITER_V4", "OKX_DEX", "OTHER"]
+    },
+    "side": {
+      "type": "string",
+      "enum": ["BUY", "SELL"],
+      "description": "From the perspective of base_mint. BUY = the wallet receives base_mint."
+    },
+    "finality": {
+      "type": "string",
+      "enum": ["PROCESSED", "CONFIRMED", "FINALIZED"]
+    },
+    "operating_mode": {
+      "type": "string",
+      "enum": ["RESEARCH", "OBSERVE", "PAPER", "SHADOW", "LIVE"]
+    },
+    "decode_confidence": {
+      "type": "string",
+      "enum": ["COMPLETE", "PARTIAL", "UNKNOWN"],
+      "description": "Only COMPLETE is economically usable. PARTIAL and UNKNOWN go to quarantine, are counted, and lower the reported data coverage."
+    },
+    "event_source": {
+      "type": "string",
+      "enum": ["HISTORICAL_BACKFILL", "LIVE_STREAM", "REPLAY", "GOLDEN_FIXTURE"]
+    },
+    "time_window": {
+      "type": "object",
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "start_utc": { "$ref": "#/$defs/utc_second" },
+        "end_utc": { "$ref": "#/$defs/utc_second" },
+        "start_slot": { "$ref": "#/$defs/slot" },
+        "end_slot": { "$ref": "#/$defs/slot" }
+      },
+      "required": ["label", "start_utc", "end_utc", "start_slot", "end_slot"],
+      "additionalProperties": false
+    }
+  }
+}

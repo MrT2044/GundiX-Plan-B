@@ -1,0 +1,9 @@
+{
+  "case_id": "10_failed_transaction",
+  "expected_events": [],
+  "expected_quarantined_wallets": [],
+  "expected_wash_same_tx": 0,
+  "wallets": [
+    "FHpcNSe6tb2n15bAdq4BkeYWGyZKFD7yLYrH92ng7wCT"
+  ]
+}

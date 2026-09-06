@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gundix.local/schemas/swap_event.schema.json",
+  "title": "SwapEvent",
+  "description": "S0 4.1. The canonical representation of a detected swap. There is exactly this one. Plan A's historical parser and Plan B's live decoder produce identical objects for the same transaction (I2).",
+  "type": "object",
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/schema_version" },
+    "chain": { "$ref": "common.schema.json#/$defs/chain" },
+    "event_id": { "$ref": "common.schema.json#/$defs/sha256_hex" },
+    "signature": { "$ref": "common.schema.json#/$defs/signature" },
+    "slot": { "$ref": "common.schema.json#/$defs/slot" },
+    "block_time_utc": { "$ref": "common.schema.json#/$defs/utc_second" },
+    "transaction_index": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Position in the block. null when the provider does not expose it. Ordering only, never part of event_id."
+    },
+    "instruction_path": { "$ref": "common.schema.json#/$defs/instruction_path" },
+    "net_swap_index": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0-based index over all net swap events of the SAME wallet in the SAME transaction, ordered by instruction_path (segment-wise numeric)."
+    },
+    "wallet": { "$ref": "common.schema.json#/$defs/solana_address" },
+    "base_mint": { "$ref": "common.schema.json#/$defs/solana_address" },
+    "quote_mint": { "$ref": "common.schema.json#/$defs/solana_address" },
+    "side": { "$ref": "common.schema.json#/$defs/side" },
+    "base_amount_raw": { "$ref": "common.schema.json#/$defs/raw_amount" },
+    "quote_amount_raw": { "$ref": "common.schema.json#/$defs/raw_amount" },
+    "base_decimals": { "$ref": "common.schema.json#/$defs/decimals" },
+    "quote_decimals": { "$ref": "common.schema.json#/$defs/decimals" },
+    "venue": { "$ref": "common.schema.json#/$defs/venue" },
+    "pool": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/solana_address" }, { "type": "null" }]
+    },
+    "router": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "program_id": { "$ref": "common.schema.json#/$defs/solana_address" },
+            "label": { "$ref": "common.schema.json#/$defs/router_label" },
+            "hops": { "type": "integer", "minimum": 1 }
+          },
+          "required": ["program_id", "label", "hops"],
+          "additionalProperties": false
+        },
+        { "type": "null" }
+      ],
+      "description": "null when the wallet traded directly against a pool."
+    },
+    "success": {
+      "type": "boolean",
+      "description": "S0 4.1.7. An event with success=false may only exist in the raw/quarantine layer. Every economic consumer filters on success == true."
+    },
+    "source": { "$ref": "common.schema.json#/$defs/event_source" },
+    "source_provider": {
+      "type": "string",
+      "minLength": 1,
+      "description": "e.g. 'public_rpc', 'helius', 'fixture'. A provider change must be visible."
+    },
+    "observed_at_utc": {
+      "$ref": "common.schema.json#/$defs/utc_millis",
+      "description": "When OUR system first saw it."
+    },
+    "finality": { "$ref": "common.schema.json#/$defs/finality" },
+    "fees": {
+      "type": "object",
+      "description": "S0 4.1.8. Transaction-wide fees are attributed in full to the event with net_swap_index = 0 of this wallet in this transaction; every further event of the same wallet carries zeros and fee_attribution = NONE. The sum over all events is therefore exactly the real transaction fee.",
+      "properties": {
+        "network_fee_lamports": { "$ref": "common.schema.json#/$defs/raw_amount" },
+        "priority_fee_lamports": { "$ref": "common.schema.json#/$defs/raw_amount" },
+        "tip_lamports": { "$ref": "common.schema.json#/$defs/raw_amount" },
+        "venue_fee_raw": { "$ref": "common.schema.json#/$defs/raw_amount" },
+        "venue_fee_mint": {
+          "oneOf": [{ "$ref": "common.schema.json#/$defs/solana_address" }, { "type": "null" }]
+        },
+        "transfer_fee_base_raw": { "$ref": "common.schema.json#/$defs/raw_amount" },
+        "transfer_fee_quote_raw": { "$ref": "common.schema.json#/$defs/raw_amount" },
+        "fee_attribution": { "type": "string", "enum": ["FULL", "NONE"] }
+      },
+      "required": [
+        "network_fee_lamports",
+        "priority_fee_lamports",
+        "tip_lamports",
+        "venue_fee_raw",
+        "venue_fee_mint",
+        "transfer_fee_base_raw",
+        "transfer_fee_quote_raw",
+        "fee_attribution"
+      ],
+      "additionalProperties": false
+    },
+    "decode_confidence": { "$ref": "common.schema.json#/$defs/decode_confidence" }
+  },
+  "required": [
+    "schema_version",
+    "chain",
+    "event_id",
+    "signature",
+    "slot",
+    "block_time_utc",
+    "transaction_index",
+    "instruction_path",
+    "net_swap_index",
+    "wallet",
+    "base_mint",
+    "quote_mint",
+    "side",
+    "base_amount_raw",
+    "quote_amount_raw",
+    "base_decimals",
+    "quote_decimals",
+    "venue",
+    "pool",
+    "router",
+    "success",
+    "source",
+    "source_provider",
+    "observed_at_utc",
+    "finality",
+    "fees",
+    "decode_confidence"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,102 @@
+# GundiX Plan B runtime configuration (example).
+# Copy to config/runtime.yaml and adjust. Secrets belong in .env, never here.
+#
+# There is deliberately no mode setting in this file. The operating mode comes from
+# GUNDIX_MODE only (S0 8.2); a configuration file must not be able to influence it.
+
+selection:
+  # The synthetic selection lets Plan B run before Plan A has delivered a real one.
+  # Swapping in a real artifact is a file change, not a code change.
+  path: artifacts/selections/synthetic_dev.json
+  require_approval: true
+  reload_interval_seconds: 30
+
+stream:
+  # replay      - deterministic, offline, from recorded fixtures (default for tests)
+  # rpc_polling - getSignaturesForAddress polling; works on the public RPC endpoint
+  # websocket   - logsSubscribe; needs a provider that allows it
+  source: replay
+  replay_path: contracts/golden_raw
+  rpc_http_url: https://api.mainnet-beta.solana.com
+  ws_url: null
+  poll_interval_seconds: 2.0
+  # The public endpoint rate limits hard. Keep this conservative.
+  rpc_max_requests_per_second: 4.0
+  commitment: CONFIRMED
+  required_finality: CONFIRMED
+  max_queue_depth: 1000
+  max_signature_backlog_per_wallet: 200
+  reconnect:
+    initial_delay_seconds: 1.0
+    max_delay_seconds: 60.0
+    multiplier: 2.0
+    jitter_ratio: 0.25
+
+policy:
+  policy_version: 0.1.0
+  # Phase 1 stays conservative. Consensus is tested separately, later.
+  dedup_policy: FIRST_SIGNAL_ONLY
+  consensus_required_wallets: 2
+  consensus_window_seconds: 120
+  max_signal_age_seconds: 90
+  intent_ttl_seconds: 20
+  base_buy_size_sol: "0.05"
+  min_buy_size_sol: "0.01"
+  max_slippage_bps: 300
+  max_price_impact_bps: 200
+  min_pool_liquidity_sol: "20"
+  allowed_quote_mints:
+    - So11111111111111111111111111111111111111112
+  blocked_mints: []
+
+risk:
+  max_trade_size_sol: "0.1"
+  max_position_per_token_sol: "0.3"
+  max_total_exposure_sol: "1.0"
+  max_daily_exposure_sol: "2.0"
+  max_daily_loss_sol: "0.5"
+  max_open_positions: 10
+  fee_reserve_sol: "0.05"
+  starting_balance_sol: "2.0"
+  max_consecutive_failures: 5
+  max_slippage_observed_bps: 1500
+  stale_feed_seconds: 120
+  min_decoder_coverage: "0.90"
+  kill_switch_file: data/KILL_SWITCH
+
+paper:
+  model_version: 0.1.0
+  # PROVISIONAL. Replaced by measured shadow data before any live discussion (I5).
+  land_probability: "0.9"
+  extra_slippage_bps: 50
+  priority_fee_lamports: 100000
+  base_fee_lamports: 5000
+  rng_seed: gundix-paper-v1
+
+quotes:
+  provider: simulated
+  quote_ttl_seconds: 10
+  http_timeout_seconds: 5
+  simulated_pool_quote_liquidity_sol: "50"
+  simulated_fee_bps: 25
+
+decoder:
+  # QUARANTINE_TRANSACTION is the behaviour S0 aggregation rule 9 mandates and the only
+  # value permitted without an approved CCR: an unknown program anywhere in the swap path
+  # puts the whole transaction into quarantine.
+  #
+  # RECONCILE_BALANCES is the CCR-001 proposal - quarantine only when the attributed
+  # movements do not match the wallet's real token balance change. Measured against 10
+  # recorded mainnet transactions, the contractual rule yields 0 usable events and the
+  # proposal yields 2. Switching this is a documented deviation from the contract, not a
+  # tuning knob, and every run logs which policy was active.
+  unknown_program_policy: QUARANTINE_TRANSACTION
+  source_provider: public_rpc
+
+database:
+  url: sqlite:///data/gundix_paper.sqlite
+  busy_timeout_ms: 5000
+
+export:
+  directory: artifacts/observations
+  producer_prefix: planb

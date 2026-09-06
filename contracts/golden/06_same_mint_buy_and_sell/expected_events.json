@@ -1,0 +1,11 @@
+{
+  "case_id": "06_same_mint_buy_and_sell",
+  "expected_events": [],
+  "expected_quarantined_wallets": [
+    "J33eRAWP1uAKgNkUF6KUCXEaWsne5SSYV7CcPGumCYtP"
+  ],
+  "expected_wash_same_tx": 0,
+  "wallets": [
+    "J33eRAWP1uAKgNkUF6KUCXEaWsne5SSYV7CcPGumCYtP"
+  ]
+}

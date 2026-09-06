@@ -1,0 +1,11 @@
+{
+  "case_id": "01_pumpfun_buy_direct",
+  "expected_events": [],
+  "expected_quarantined_wallets": [
+    "7cTUhpTPbC6F4Q6gQ3jkurQ5Hz5sQ7tXRWTbq7U4n8hj"
+  ],
+  "expected_wash_same_tx": 0,
+  "wallets": [
+    "7cTUhpTPbC6F4Q6gQ3jkurQ5Hz5sQ7tXRWTbq7U4n8hj"
+  ]
+}

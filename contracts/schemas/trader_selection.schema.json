@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gundix.local/schemas/trader_selection.schema.json",
+  "title": "TraderSelection",
+  "description": "S0 4.4. The central handover artifact from Plan A to Plan B. Plan B consumes it unchanged and never re-ranks or auto-refreshes it.",
+  "type": "object",
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/schema_version" },
+    "selection_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{2,127}$",
+      "description": "e.g. sel_2026-06-01T12-00-00Z_a1b2c3d4"
+    },
+    "created_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+    "data_snapshot_id": { "type": "string", "minLength": 1 },
+    "code_commit": { "$ref": "common.schema.json#/$defs/git_sha" },
+    "params_hash": { "$ref": "common.schema.json#/$defs/sha256_hex" },
+    "score_version": { "$ref": "common.schema.json#/$defs/semver" },
+    "selection_window": { "$ref": "common.schema.json#/$defs/time_window" },
+    "evaluation_window": { "$ref": "common.schema.json#/$defs/time_window" },
+    "wallets": {
+      "type": "array",
+      "description": "May be empty. An empty selection is valid: it allows observation but produces no intents.",
+      "items": { "$ref": "#/$defs/selected_wallet" }
+    },
+    "applied_filters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "filter_id": { "type": "string", "minLength": 1 },
+          "threshold": { "type": ["string", "null"] },
+          "threshold_version": { "$ref": "common.schema.json#/$defs/semver" },
+          "wallets_removed": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["filter_id", "threshold", "threshold_version", "wallets_removed"],
+        "additionalProperties": false
+      }
+    },
+    "manual_approval": {
+      "type": "object",
+      "properties": {
+        "approved": { "type": "boolean" },
+        "approved_by": { "type": "string", "minLength": 1 },
+        "approved_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+        "note": { "type": "string" }
+      },
+      "required": ["approved", "approved_by", "approved_at_utc"],
+      "additionalProperties": false
+    },
+    "expires_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" }
+  },
+  "required": [
+    "schema_version",
+    "selection_id",
+    "created_at_utc",
+    "data_snapshot_id",
+    "code_commit",
+    "params_hash",
+    "score_version",
+    "selection_window",
+    "evaluation_window",
+    "wallets",
+    "applied_filters",
+    "manual_approval",
+    "expires_at_utc"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "selected_wallet": {
+      "type": "object",
+      "properties": {
+        "wallet": { "$ref": "common.schema.json#/$defs/solana_address" },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "OBSERVE_ONLY", "SUSPENDED"],
+          "description": "Only ACTIVE may create a CopyIntent. Everything else always yields NO_TRADE with reason wallet_not_selected."
+        },
+        "rank": { "type": "integer", "minimum": 1 },
+        "score": { "$ref": "common.schema.json#/$defs/signed_decimal" },
+        "weight": { "$ref": "common.schema.json#/$defs/unsigned_decimal" },
+        "max_weight": { "$ref": "common.schema.json#/$defs/unsigned_decimal" },
+        "reason_codes": { "type": "array", "items": { "type": "string" } },
+        "risks": { "type": "array", "items": { "type": "string" } },
+        "coverage_ratio": { "$ref": "common.schema.json#/$defs/unsigned_decimal" },
+        "metrics_ref": {
+          "type": ["string", "null"],
+          "description": "Path to the full per-wallet metrics report inside Plan A's repo. Opaque to Plan B."
+        },
+        "copy_pnl_by_latency": {
+          "type": "object",
+          "properties": {
+            "1s": { "$ref": "common.schema.json#/$defs/signed_decimal" },
+            "3s": { "$ref": "common.schema.json#/$defs/signed_decimal" },
+            "5s": { "$ref": "common.schema.json#/$defs/signed_decimal" },
+            "15s": { "$ref": "common.schema.json#/$defs/signed_decimal" },
+            "60s": { "$ref": "common.schema.json#/$defs/signed_decimal" }
+          },
+          "required": ["1s", "3s", "5s", "15s", "60s"],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "wallet",
+        "status",
+        "rank",
+        "score",
+        "weight",
+        "max_weight",
+        "reason_codes",
+        "risks",
+        "coverage_ratio",
+        "metrics_ref",
+        "copy_pnl_by_latency"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

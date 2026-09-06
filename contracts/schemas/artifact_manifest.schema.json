@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gundix.local/schemas/artifact_manifest.schema.json",
+  "title": "ArtifactManifest",
+  "description": "S0 7.2. Sidecar `<file_name>.manifest.json` for every artifact. The reader verifies content_sha256 BEFORE using the payload; a mismatch is fail-closed. A file found without a manifest is treated as incomplete.",
+  "type": "object",
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/schema_version" },
+    "artifact_type": {
+      "type": "string",
+      "enum": [
+        "wallet_candidates",
+        "trader_selection",
+        "swap_events",
+        "copy_intents",
+        "paper_fills",
+        "latency",
+        "decoder_coverage",
+        "report"
+      ]
+    },
+    "file_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "description": "Plain file name next to the manifest. No directory component, no traversal."
+    },
+    "file_bytes": { "type": "integer", "minimum": 0 },
+    "content_sha256": { "$ref": "common.schema.json#/$defs/sha256_hex" },
+    "record_schema_version": { "$ref": "common.schema.json#/$defs/schema_version" },
+    "record_count": { "type": "integer", "minimum": 0 },
+    "producer": {
+      "type": "object",
+      "properties": {
+        "plan": { "type": "string", "enum": ["A", "B"] },
+        "component": { "type": "string", "minLength": 1 },
+        "version": { "$ref": "common.schema.json#/$defs/semver" }
+      },
+      "required": ["plan", "component", "version"],
+      "additionalProperties": false
+    },
+    "git_commit": { "type": "string", "pattern": "^([0-9a-f]{40}|UNCOMMITTED)$" },
+    "contracts_commit": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{40}|UNCOMMITTED)$",
+      "description": "Mandatory: it must always be provable which schema version an artifact was produced against."
+    },
+    "config_hash": { "$ref": "common.schema.json#/$defs/sha256_hex" },
+    "created_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+    "data_snapshot_id": { "type": ["string", "null"] },
+    "observation_window": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "start_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+            "end_utc": { "$ref": "common.schema.json#/$defs/utc_millis" }
+          },
+          "required": ["start_utc", "end_utc"],
+          "additionalProperties": false
+        },
+        { "type": "null" }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "file_name",
+    "file_bytes",
+    "content_sha256",
+    "record_schema_version",
+    "record_count",
+    "producer",
+    "git_commit",
+    "contracts_commit",
+    "config_hash",
+    "created_at_utc",
+    "data_snapshot_id",
+    "observation_window"
+  ],
+  "additionalProperties": false
+}

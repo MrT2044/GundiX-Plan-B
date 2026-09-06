@@ -1,0 +1,11 @@
+{
+  "case_id": "04_jupiter_multi_venue_route",
+  "expected_events": [],
+  "expected_quarantined_wallets": [
+    "Fqczgf9KfSVXtMtXccq6SE1yBfWeUXefJ3ithStptTUa"
+  ],
+  "expected_wash_same_tx": 0,
+  "wallets": [
+    "Fqczgf9KfSVXtMtXccq6SE1yBfWeUXefJ3ithStptTUa"
+  ]
+}

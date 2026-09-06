@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gundix.local/schemas/execution_result.schema.json",
+  "title": "ExecutionResult",
+  "description": "S0 4.6. Paper, shadow and live brokers all emit this shape. status = UNKNOWN is a blocking state, not a result: it blocks follow-up actions for that token until a reconciliation resolves it, is never reinterpreted as FAILED and never answered with another order.",
+  "type": "object",
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/schema_version" },
+    "result_id": { "$ref": "common.schema.json#/$defs/sha256_hex" },
+    "intent_id": { "$ref": "common.schema.json#/$defs/sha256_hex" },
+    "mode": { "$ref": "common.schema.json#/$defs/operating_mode" },
+    "status": {
+      "type": "string",
+      "enum": ["FILLED", "PARTIAL", "FAILED", "EXPIRED", "REJECTED", "UNKNOWN"]
+    },
+    "quote": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string", "minLength": 1 },
+            "requested_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+            "expires_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+            "in_amount_raw": { "$ref": "common.schema.json#/$defs/raw_amount" },
+            "out_amount_raw": { "$ref": "common.schema.json#/$defs/raw_amount" },
+            "price_impact_bps": { "$ref": "common.schema.json#/$defs/bps" },
+            "route_hops": { "type": "integer", "minimum": 1 },
+            "platform_fee_raw": { "$ref": "common.schema.json#/$defs/raw_amount" }
+          },
+          "required": [
+            "provider",
+            "requested_at_utc",
+            "expires_at_utc",
+            "in_amount_raw",
+            "out_amount_raw",
+            "price_impact_bps",
+            "route_hops",
+            "platform_fee_raw"
+          ],
+          "additionalProperties": false
+        },
+        { "type": "null" }
+      ]
+    },
+    "expected_price": { "$ref": "common.schema.json#/$defs/unsigned_decimal" },
+    "realized_price": { "$ref": "common.schema.json#/$defs/unsigned_decimal" },
+    "filled_base_raw": { "$ref": "common.schema.json#/$defs/raw_amount" },
+    "filled_quote_raw": { "$ref": "common.schema.json#/$defs/raw_amount" },
+    "fees": {
+      "type": "object",
+      "properties": {
+        "network_fee_lamports": { "$ref": "common.schema.json#/$defs/raw_amount" },
+        "priority_fee_lamports": { "$ref": "common.schema.json#/$defs/raw_amount" },
+        "tip_lamports": { "$ref": "common.schema.json#/$defs/raw_amount" },
+        "venue_fee_raw": { "$ref": "common.schema.json#/$defs/raw_amount" }
+      },
+      "required": [
+        "network_fee_lamports",
+        "priority_fee_lamports",
+        "tip_lamports",
+        "venue_fee_raw"
+      ],
+      "additionalProperties": false
+    },
+    "latencies_ms": {
+      "type": "object",
+      "description": "The stage names are exactly those of Plan B section B2. Plan A reads these names in A10 to recompute the frozen backtest with measured distributions. Renaming one is a breaking change.",
+      "properties": {
+        "block_to_receive": { "type": ["integer", "null"] },
+        "receive_to_decode": { "type": ["integer", "null"] },
+        "decode_to_decision": { "type": ["integer", "null"] },
+        "decision_to_quote": { "type": ["integer", "null"] },
+        "quote_to_submit": { "type": ["integer", "null"] },
+        "submit_to_confirm": { "type": ["integer", "null"] }
+      },
+      "required": [
+        "block_to_receive",
+        "receive_to_decode",
+        "decode_to_decision",
+        "decision_to_quote",
+        "quote_to_submit",
+        "submit_to_confirm"
+      ],
+      "additionalProperties": false
+    },
+    "signature": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/signature" }, { "type": "null" }],
+      "description": "Always null for PAPER and SHADOW."
+    },
+    "error_code": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "NO_ROUTE",
+            "QUOTE_EXPIRED",
+            "SLIPPAGE_EXCEEDED",
+            "INSUFFICIENT_LIQUIDITY",
+            "SIMULATED_FAIL",
+            "TOKEN_RESTRICTED",
+            "PROVIDER_TIMEOUT",
+            "PROVIDER_ERROR",
+            "STATE_MISMATCH"
+          ]
+        },
+        { "type": "null" }
+      ]
+    },
+    "error_detail": { "type": ["string", "null"] },
+    "created_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+    "finalized_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" }
+  },
+  "required": [
+    "schema_version",
+    "result_id",
+    "intent_id",
+    "mode",
+    "status",
+    "quote",
+    "expected_price",
+    "realized_price",
+    "filled_base_raw",
+    "filled_quote_raw",
+    "fees",
+    "latencies_ms",
+    "signature",
+    "error_code",
+    "error_detail",
+    "created_at_utc",
+    "finalized_at_utc"
+  ],
+  "additionalProperties": false
+}

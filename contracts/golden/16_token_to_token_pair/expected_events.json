@@ -1,0 +1,11 @@
+{
+  "case_id": "16_token_to_token_pair",
+  "expected_events": [],
+  "expected_quarantined_wallets": [
+    "CJYNMqDZcDwDshCSRgBmtDJmgzdvE5AejmvP918w51iL"
+  ],
+  "expected_wash_same_tx": 0,
+  "wallets": [
+    "CJYNMqDZcDwDshCSRgBmtDJmgzdvE5AejmvP918w51iL"
+  ]
+}

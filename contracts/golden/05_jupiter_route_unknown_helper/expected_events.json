@@ -1,0 +1,11 @@
+{
+  "case_id": "05_jupiter_route_unknown_helper",
+  "expected_events": [],
+  "expected_quarantined_wallets": [
+    "6VAD25T6dSQTXhNeXVWHXq7AKnFrQrGc5gsBE5sNQBT5"
+  ],
+  "expected_wash_same_tx": 0,
+  "wallets": [
+    "6VAD25T6dSQTXhNeXVWHXq7AKnFrQrGc5gsBE5sNQBT5"
+  ]
+}

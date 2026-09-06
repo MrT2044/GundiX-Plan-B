@@ -1,0 +1,68 @@
+[project]
+name = "gundix"
+version = "0.1.0"
+description = "GundiX - Solana copy-trading research and execution system"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.9",
+    "jsonschema>=4.20",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "httpx>=0.27",
+    "websockets>=12.0",
+    "base58>=2.1",
+    "orjson>=3.10",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+# Plan A analytics stack (polars/duckdb) is declared by Plan A when it lands.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gundix_placeholder"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+  "integration: benoetigt echte Provider-Zugaenge, ohne Keys uebersprungen",
+  "golden: Contract-Reconciliation gegen contracts/golden",
+]
+pythonpath = [".", "contracts/python"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF", "ASYNC", "DTZ"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+files = ["src", "contracts/python", "tests"]
+mypy_path = "contracts/python"
+ignore_missing_imports = true
+
+# Tests are type-checked, but pytest fixtures are injected by name and annotating every
+# parameter with the fixture's concrete type adds noise without catching anything: a wrong
+# fixture type fails the test immediately. Production code stays fully strict.
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false

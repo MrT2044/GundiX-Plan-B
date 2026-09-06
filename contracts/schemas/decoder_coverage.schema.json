@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gundix.local/schemas/decoder_coverage.schema.json",
+  "title": "DecoderCoverage",
+  "description": "S0 7.1 requires artifacts/observations/decoder_coverage_<ts>.json but does not specify its content; Plan B owns this record. It answers the question Plan A needs for A10 and for the I6 criterion 'relevante Decoder-Luecken': what share of the observed transactions could be turned into economically usable events, and what exactly was lost.",
+  "type": "object",
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/schema_version" },
+    "window": {
+      "type": "object",
+      "properties": {
+        "start_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+        "end_utc": { "$ref": "common.schema.json#/$defs/utc_millis" }
+      },
+      "required": ["start_utc", "end_utc"],
+      "additionalProperties": false
+    },
+    "transactions_seen": { "type": "integer", "minimum": 0 },
+    "transactions_failed_onchain": { "type": "integer", "minimum": 0 },
+    "transactions_decoded_complete": { "type": "integer", "minimum": 0 },
+    "transactions_partial": { "type": "integer", "minimum": 0 },
+    "transactions_unknown": { "type": "integer", "minimum": 0 },
+    "transactions_no_swap": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Transfers, LP actions and other non-swap activity of a watched wallet."
+    },
+    "coverage_ratio": {
+      "$ref": "common.schema.json#/$defs/unsigned_decimal",
+      "description": "transactions_decoded_complete / (transactions_seen - transactions_failed_onchain - transactions_no_swap). 0..1."
+    },
+    "events_emitted": { "type": "integer", "minimum": 0 },
+    "quarantined": { "type": "integer", "minimum": 0 },
+    "unknown_programs": {
+      "type": "array",
+      "description": "Every program that caused a quarantine, with how often. This is the worklist for extending the decoder.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "program_id": { "$ref": "common.schema.json#/$defs/solana_address" },
+          "occurrences": { "type": "integer", "minimum": 1 },
+          "affected_wallets": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["program_id", "occurrences", "affected_wallets"],
+        "additionalProperties": false
+      }
+    },
+    "venues_seen": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "venue": { "$ref": "common.schema.json#/$defs/venue" },
+          "events": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["venue", "events"],
+        "additionalProperties": false
+      }
+    },
+    "quarantine_reasons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "minLength": 1 },
+          "count": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["reason", "count"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "window",
+    "transactions_seen",
+    "transactions_failed_onchain",
+    "transactions_decoded_complete",
+    "transactions_partial",
+    "transactions_unknown",
+    "transactions_no_swap",
+    "coverage_ratio",
+    "events_emitted",
+    "quarantined",
+    "unknown_programs",
+    "venues_seen",
+    "quarantine_reasons"
+  ],
+  "additionalProperties": false
+}

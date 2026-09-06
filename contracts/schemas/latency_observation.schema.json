@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gundix.local/schemas/latency_observation.schema.json",
+  "title": "LatencyObservation",
+  "description": "One measured pipeline traversal. Emitted by Plan B as artifacts/observations/latency_<ts>.jsonl (S0 7.1) and consumed by Plan A in A10 to replace the provisional latency assumptions of the copy backtest. S0 does not specify this record; Plan B owns it. The stage names are identical to ExecutionResult.latencies_ms so both artifacts can be joined without a translation table.",
+  "type": "object",
+  "properties": {
+    "schema_version": { "$ref": "common.schema.json#/$defs/schema_version" },
+    "event_id": { "$ref": "common.schema.json#/$defs/sha256_hex" },
+    "signature": { "$ref": "common.schema.json#/$defs/signature" },
+    "wallet": { "$ref": "common.schema.json#/$defs/solana_address" },
+    "slot": { "$ref": "common.schema.json#/$defs/slot" },
+    "block_time_utc": { "$ref": "common.schema.json#/$defs/utc_second" },
+    "received_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+    "decoded_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+    "decided_at_utc": { "$ref": "common.schema.json#/$defs/utc_millis" },
+    "quoted_at_utc": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/utc_millis" }, { "type": "null" }]
+    },
+    "submitted_at_utc": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/utc_millis" }, { "type": "null" }]
+    },
+    "latencies_ms": {
+      "type": "object",
+      "properties": {
+        "block_to_receive": { "type": ["integer", "null"] },
+        "receive_to_decode": { "type": ["integer", "null"] },
+        "decode_to_decision": { "type": ["integer", "null"] },
+        "decision_to_quote": { "type": ["integer", "null"] },
+        "quote_to_submit": { "type": ["integer", "null"] },
+        "submit_to_confirm": { "type": ["integer", "null"] }
+      },
+      "required": [
+        "block_to_receive",
+        "receive_to_decode",
+        "decode_to_decision",
+        "decision_to_quote",
+        "quote_to_submit",
+        "submit_to_confirm"
+      ],
+      "additionalProperties": false
+    },
+    "source": {
+      "$ref": "common.schema.json#/$defs/event_source",
+      "description": "REPLAY and GOLDEN_FIXTURE observations MUST be excluded from live latency statistics: their block_to_receive is an artefact of when the fixture was replayed."
+    },
+    "source_provider": { "type": "string", "minLength": 1 },
+    "mode": { "$ref": "common.schema.json#/$defs/operating_mode" },
+    "decision": { "type": "string", "enum": ["EXECUTE", "NO_TRADE"] },
+    "reason_code": { "type": ["string", "null"] }
+  },
+  "required": [
+    "schema_version",
+    "event_id",
+    "signature",
+    "wallet",
+    "slot",
+    "block_time_utc",
+    "received_at_utc",
+    "decoded_at_utc",
+    "decided_at_utc",
+    "quoted_at_utc",
+    "submitted_at_utc",
+    "latencies_ms",
+    "source",
+    "source_provider",
+    "mode",
+    "decision",
+    "reason_code"
+  ],
+  "additionalProperties": false
+}
