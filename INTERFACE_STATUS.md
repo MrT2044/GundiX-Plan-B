@@ -4,6 +4,12 @@ Stand: 2026-09-09
 Contracts: lokal unter `contracts/`, noch **kein** eigenes Repo und kein Tag (S0 §14 Punkt 2 offen)
 Modus dieses Builds: `PAPER` / `SHADOW` möglich, `LIVE` hart gesperrt
 
+> **Kanal zu Plan A:** Die für Plan A bestimmte Fassung liegt in
+> `Lx1308/gundix-plan-b/INTERFACE_STATUS.md` – das ist das Repo, das Plan A liest, und dort
+> steht auch der Widerspruch aus Schritt 4 ihres Onboardings. Diese Datei hier ist der
+> ausführliche interne Stand. Beide fallen zusammen, sobald der Code umgezogen ist; der
+> Umzug wartet auf Lesezugriff für `MrT2044` auf `Lx1308/gundix-contracts`.
+
 ---
 
 ## Ich produziere
