@@ -231,6 +231,39 @@ def token_balance_deltas(transaction: Mapping[str, Any], wallet: str) -> dict[st
     return {mint: value for mint, value in totals.items() if value != 0}
 
 
+def wallets_that_traded(transaction: Mapping[str, Any]) -> tuple[str, ...]:
+    """Owners whose own token balance changed in this transaction.
+
+    Not the fee payer. Measured against live mainnet on 2026-09-09: of 40 sampled
+    transactions from one high-frequency address, the address was the fee payer in all 40
+    and a swap venue was present in all 40, yet its own token balance changed in none of
+    them and its net SOL flow was exactly zero. It sponsors other people's trades.
+
+    Taking the fee payer as "the trader" therefore watches the relayer instead of the
+    person whose decisions are worth copying. Balance ownership is the property that
+    actually identifies who traded.
+    """
+    meta = transaction.get("meta") or {}
+    before: dict[tuple[str, str], int] = {}
+    after: dict[tuple[str, str], int] = {}
+    for bucket, target in (("preTokenBalances", before), ("postTokenBalances", after)):
+        for entry in meta.get(bucket) or []:
+            owner = entry.get("owner")
+            amount = (entry.get("uiTokenAmount") or {}).get("amount")
+            if not owner or amount is None:
+                continue
+            key = (str(owner), str(entry.get("mint")))
+            target[key] = target.get(key, 0) + int(amount)
+
+    traded: list[str] = []
+    for key in dict.fromkeys(list(before) + list(after)):
+        if before.get(key, 0) != after.get(key, 0):
+            owner = key[0]
+            if owner not in traded:
+                traded.append(owner)
+    return tuple(traded)
+
+
 def sol_sphere_flow(
     transaction: Mapping[str, Any],
     keys: Sequence[str],
@@ -924,4 +957,5 @@ __all__ = [
     "swap_top_indices",
     "token_accounts",
     "token_balance_deltas",
+    "wallets_that_traded",
 ]

@@ -111,6 +111,21 @@ def main() -> int:
             if not outcomes:
                 time.sleep(args.interval)
     finally:
+        # The stale-feed circuit breaker existed but nothing ever fed it. A live run showed
+        # why that matters: against the public RPC the poller fell minutes behind.
+        with unit_of_work(app.session_factory) as session:
+            tripped = app.risk.evaluate_circuit_breakers(
+                session,
+                now=datetime.now(UTC),
+                feed_age_seconds=app.pipeline.last_feed_lag_seconds,
+                decoder_coverage=app.pipeline.coverage.coverage_ratio
+                if app.pipeline.coverage.transactions_seen
+                else None,
+                observed_slippage_bps=None,
+            )
+        if tripped:
+            log_event(logger, 40, "circuit breakers tripped", breakers=tripped)
+
         result = app.exporter.export(
             latencies=app.pipeline.latency_observations,
             results=app.pipeline.execution_results,

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -140,6 +140,11 @@ class Pipeline:
         self.coverage = CoverageCounters()
         self._latency_buffer: list[LatencyObservation] = []
         self._results_buffer: list[ExecutionResult] = []
+        #: Seconds between a transaction's block time and the moment we received it. A
+        #: poller that cannot keep up shows here as a value that climbs run over run, which
+        #: is what a live run against the public RPC actually did.
+        self.last_feed_lag_seconds: float | None = None
+        self.max_feed_lag_seconds: float = 0.0
 
         if config.decoder.unknown_program_policy != "QUARANTINE_TRANSACTION":
             log_event(
@@ -190,6 +195,7 @@ class Pipeline:
             failed = raw.failed_on_chain or transaction_failed(raw.payload)
             if failed:
                 self.coverage.transactions_failed_onchain += 1
+            self._record_feed_lag(raw)
             if raw.payload is None:
                 self.coverage.transactions_no_swap += 1
                 return outcome
@@ -226,6 +232,15 @@ class Pipeline:
                     outcome=outcome,
                 )
         return outcome
+
+    def _record_feed_lag(self, raw: RawChainEvent) -> None:
+        """How far behind the chain we are, measured rather than assumed."""
+        block_time = block_time_of(raw.payload)
+        if block_time is None:
+            return
+        lag = (raw.received_at_utc - block_time).total_seconds()
+        self.last_feed_lag_seconds = lag
+        self.max_feed_lag_seconds = max(self.max_feed_lag_seconds, lag)
 
     # -- per event ----------------------------------------------------------------------
     def _handle_event(
@@ -470,6 +485,15 @@ class Pipeline:
             return dict(row.value) if row is not None else None
 
 
+def block_time_of(transaction: dict[str, Any] | None) -> datetime | None:
+    if not transaction:
+        return None
+    block_time = transaction.get("blockTime")
+    if block_time is None:
+        return None
+    return datetime.fromtimestamp(int(block_time), tz=UTC)
+
+
 def transaction_failed(transaction: dict[str, Any] | None) -> bool:
     if not transaction:
         return False
@@ -543,6 +567,7 @@ __all__ = [
     "EventSource",
     "Pipeline",
     "ProcessOutcome",
+    "block_time_of",
     "pool_quote_liquidity",
     "pre_balance_of",
     "transaction_failed",

@@ -17,7 +17,7 @@ import argparse
 import json
 import sys
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -58,7 +58,12 @@ def build(wallets: list[str], *, approved: bool, now: datetime) -> TraderSelecti
     zero = CopyPnlByLatency.model_validate(
         {"1s": "0", "3s": "0", "5s": "0", "15s": "0", "60s": "0"}
     )
-    weight = (Decimal(1) / Decimal(max(1, len(wallets)))).quantize(Decimal("0.0001"))
+    # Rounded DOWN: rounding to nearest would let the weights sum above 1 and the contract
+    # would reject the selection (S0 4.4 rejection rule 7). Losing a fraction of a basis
+    # point of allocation is the harmless side of that trade.
+    weight = (Decimal(1) / Decimal(max(1, len(wallets)))).quantize(
+        Decimal("0.0001"), rounding=ROUND_DOWN
+    )
     entries = tuple(
         SelectedWallet(
             wallet=wallet,
@@ -122,11 +127,23 @@ def main() -> int:
         help="mark it approved so the paper path can run end to end; off by default",
     )
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument(
+        "--wallets",
+        default="",
+        help=(
+            "comma separated wallet addresses to watch instead of the fixture wallets. "
+            "Used for live observation runs against wallets that are demonstrably active."
+        ),
+    )
     args = parser.parse_args()
 
-    wallets = wallets_from_fixtures()
+    wallets = (
+        [w.strip() for w in args.wallets.split(",") if w.strip()]
+        if args.wallets
+        else wallets_from_fixtures()
+    )
     if not wallets:
-        print("no wallets found in contracts/golden_raw; run scripts/record_golden.py first")
+        print("no wallets given and none found in contracts/golden_raw")
         return 1
 
     now = datetime.now(UTC)

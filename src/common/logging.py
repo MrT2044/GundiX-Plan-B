@@ -74,6 +74,11 @@ class JsonFormatter(logging.Formatter):
             return json.dumps({"level": "ERROR", "message": "log serialisation failed"})
 
 
+#: Libraries that log one line per HTTP call. At a few requests per second that buries
+#: every line we actually wrote, so they start one level quieter than the application.
+_NOISY_LIBRARIES = ("httpx", "httpcore", "urllib3")
+
+
 def configure_logging(level: int = logging.INFO, *, stream: Any = None) -> None:
     handler = logging.StreamHandler(stream or sys.stderr)
     handler.setFormatter(JsonFormatter())
@@ -82,6 +87,8 @@ def configure_logging(level: int = logging.INFO, *, stream: Any = None) -> None:
         root.removeHandler(existing)
     root.addHandler(handler)
     root.setLevel(level)
+    for name in _NOISY_LIBRARIES:
+        logging.getLogger(name).setLevel(max(level, logging.WARNING))
 
 
 def get_logger(name: str) -> logging.Logger:

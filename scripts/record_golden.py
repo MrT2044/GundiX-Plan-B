@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +25,10 @@ from typing import Any
 import httpx
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(REPO_ROOT), str(REPO_ROOT / "contracts" / "python")]
+
+from src.stream.decoder import wallets_that_traded  # noqa: E402
+
 FIXTURE_DIR = REPO_ROOT / "contracts" / "golden" / "transactions"
 DEFAULT_RPC = "https://api.mainnet-beta.solana.com"
 
@@ -87,6 +92,21 @@ def fee_payer(transaction: dict[str, Any]) -> str | None:
     return first if isinstance(first, str) else str(first.get("pubkey"))
 
 
+def observed_wallets(transaction: dict[str, Any]) -> list[str]:
+    """Who actually traded, falling back to the fee payer only when nobody did.
+
+    Measured on live mainnet: for bot-relayed transactions the fee payer is a sponsor whose
+    own balances never move. Recording it as "the wallet" produces a fixture whose expected
+    output is an empty list - technically correct and completely useless as a test of a
+    decoder.
+    """
+    traders = list(wallets_that_traded(transaction))
+    if traders:
+        return traders
+    payer = fee_payer(transaction)
+    return [payer] if payer else []
+
+
 def write_fixture(
     *,
     case: str,
@@ -128,11 +148,11 @@ def main() -> int:
             if transaction is None:
                 print(f"  {signature}: not found")
                 continue
-            wallet = fee_payer(transaction)
+            wallets = observed_wallets(transaction)
             path = write_fixture(
                 case=f"{args.case_prefix}{signature[:16]}",
                 description="manually requested signature",
-                wallets=[wallet] if wallet else [],
+                wallets=wallets,
                 transaction=transaction,
                 rpc_url=args.rpc,
             )
@@ -167,12 +187,12 @@ def main() -> int:
                     continue
                 if transaction is None:
                     continue
-                wallet = fee_payer(transaction)
+                wallets = observed_wallets(transaction)
                 suffix = "failed" if failed else f"ok{ok_count}"
                 path = write_fixture(
                     case=f"{label}_{suffix}",
                     description=f"recent {label} transaction ({'failed' if failed else 'successful'})",
-                    wallets=[wallet] if wallet else [],
+                    wallets=wallets,
                     transaction=transaction,
                     rpc_url=args.rpc,
                 )

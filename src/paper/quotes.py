@@ -9,10 +9,9 @@ Two implementations:
   reference price. Used in PAPER, where the point is to exercise the decision path, not to
   predict a price. It is honest about being a model: its output carries the pool size it
   assumed, so a later calibration against real quotes is possible.
-* :class:`JupiterQuoteProvider` - a real HTTP quote. **The endpoint and its response shape
-  must be verified against the current official API before this is used for anything that
-  informs a decision** (02_PLAN_B B8). Until an integration test has run against the live
-  service, treat its output as unverified.
+* :class:`JupiterQuoteProvider` - a real HTTP quote. Endpoint and response shape were
+  verified against the live API on 2026-09-09; rate limits and terms of use were not, so
+  02_PLAN_B B8 is only partly satisfied. See the class docstring for exactly what holds.
 """
 
 from __future__ import annotations
@@ -20,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
 import httpx
 from gundix_contracts.mints import LAMPORTS_PER_SOL
@@ -141,14 +140,36 @@ class SimulatedQuoteProvider:
 class JupiterQuoteProvider:
     """Real quotes over HTTP.
 
-    NOT VERIFIED against the live API in this build. 02_PLAN_B B8 requires the current
-    official API, its cost structure, authentication and terms of use to be checked before
-    an execution path commits to a provider. Until an integration test has run against the
-    live service, this class must not inform a decision that matters.
+    **Verified against the live API on 2026-09-09** (see
+    ``tests/integration/test_jupiter_quotes.py``, marked ``integration``). What the check
+    established, and what it corrected:
+
+    * ``quote-api.jup.ag`` - the host this adapter originally targeted - **no longer
+      resolves at all**. The live endpoints are ``lite-api.jup.ag`` (keyless) and
+      ``api.jup.ag``. This is exactly the stale-endpoint failure 02_PLAN_B B8 warns about.
+    * There is no 404 for an unroutable pair. Failures arrive as **HTTP 400 with a
+      machine-readable ``errorCode``**, so the previous 404 branch could never have fired
+      and every failure would have been misreported as a generic provider error.
+    * ``priceImpactPct`` is a fraction, not a percentage: ``"0.99"`` means 99 %.
+    * ``platformFee`` is ``null`` rather than absent when no fee applies.
+
+    Still **not** established, and therefore not claimed: rate limits (the responses carry
+    no rate-limit headers), the terms of use, and whether the keyless tier is appropriate
+    for sustained production use. 02_PLAN_B B8 requires all of that before an execution
+    path commits to this provider.
     """
 
     name = "jupiter"
-    default_base_url = "https://quote-api.jup.ag/v6"
+    #: The keyless tier. ``api.jup.ag`` answered without a key too, but Jupiter documents
+    #: that one as the keyed tier, so the default is the one that is meant to be keyless.
+    default_base_url = "https://lite-api.jup.ag/swap/v1"
+
+    #: Observed on 2026-09-09. Anything not listed is reported as a provider error together
+    #: with its code, rather than being guessed into a category.
+    _ERROR_CODES: ClassVar[dict[str, str]] = {
+        "TOKEN_NOT_TRADABLE": "TOKEN_RESTRICTED",
+        "CIRCULAR_ARBITRAGE_IS_DISABLED": "PROVIDER_ERROR",
+    }
 
     def __init__(
         self,
@@ -161,12 +182,6 @@ class JupiterQuoteProvider:
         self._clock = clock
         self._base_url = (config.base_url or self.default_base_url).rstrip("/")
         self._client = client or httpx.Client(timeout=config.http_timeout_seconds)
-        self._verified = False
-
-    @property
-    def is_verified(self) -> bool:
-        """True only after an integration test confirmed the live response shape."""
-        return self._verified
 
     def quote(self, request: QuoteRequest) -> QuoteSnapshot:
         params = {
@@ -182,18 +197,36 @@ class JupiterQuoteProvider:
         except httpx.HTTPError as exc:
             raise QuoteError(f"quote request failed: {exc}", code="PROVIDER_ERROR") from exc
 
-        if response.status_code == 404:
-            raise QuoteError("no route for this pair", code="NO_ROUTE")
         if response.status_code >= 400:
-            raise QuoteError(
-                f"quote provider returned HTTP {response.status_code}", code="PROVIDER_ERROR"
-            )
+            raise self._error_from(response)
         try:
             payload: dict[str, Any] = response.json()
         except ValueError as exc:
             raise QuoteError("quote response was not JSON", code="PROVIDER_ERROR") from exc
 
         return self._parse(payload, request)
+
+    def _error_from(self, response: httpx.Response) -> QuoteError:
+        """Turn a 400 body into the right category, using the provider's own error code."""
+        try:
+            body = response.json()
+        except ValueError:
+            return QuoteError(
+                f"quote provider returned HTTP {response.status_code}", code="PROVIDER_ERROR"
+            )
+        error_code = str(body.get("errorCode") or "")
+        message = str(body.get("error") or f"HTTP {response.status_code}")
+
+        mapped = self._ERROR_CODES.get(error_code)
+        if mapped is None and "ROUTE" in error_code.upper():
+            # Jupiter groups its routing failures under codes containing ROUTE. Treating
+            # them as "no route" is a narrower and safer reading than "provider broken".
+            mapped = "NO_ROUTE"
+        if response.status_code == 429:
+            mapped = "PROVIDER_TIMEOUT"
+        return QuoteError(
+            f"{message} (errorCode={error_code or 'none'})", code=mapped or "PROVIDER_ERROR"
+        )
 
     def _parse(self, payload: dict[str, Any], request: QuoteRequest) -> QuoteSnapshot:
         out_amount = payload.get("outAmount")
@@ -205,6 +238,8 @@ class JupiterQuoteProvider:
                 code="PROVIDER_ERROR",
             )
         route = payload.get("routePlan") or []
+        # Despite the name, priceImpactPct is a *fraction*: "0.99" means 99 %. Verified
+        # against the live API on 2026-09-09.
         impact_raw = payload.get("priceImpactPct") or "0"
         try:
             impact_bps = int(

@@ -1,6 +1,6 @@
 # INTERFACE_STATUS – Plan B
 
-Stand: 2026-09-06
+Stand: 2026-09-09
 Contracts: lokal unter `contracts/`, noch **kein** eigenes Repo und kein Tag (S0 §14 Punkt 2 offen)
 Modus dieses Builds: `PAPER` / `SHADOW` möglich, `LIVE` hart gesperrt
 
@@ -39,17 +39,17 @@ aktive Auswahl.
 |---|---|---|
 | B0 Contracts und Skelett | abgenommen | `tests/contracts/` – 49 Tests, Modell/Schema-Feldgleichheit in beide Richtungen |
 | B1 Selection-Import | abgenommen | `tests/paper/test_selection.py` – alle acht Ablehnungsregeln, atomarer Reload, letzte gültige Auswahl bleibt |
-| B2 Live-Listener | **teilweise** | Replay- und RPC-Polling-Quelle implementiert; Cursor und Gap-Erkennung getestet. **Nicht** gegen echtes RPC im Dauerbetrieb verifiziert. WebSocket bewusst nicht gebaut (siehe unten). |
+| B2 Live-Listener | **teilweise, jetzt live belegt** | 178 echte Transaktionen in 4 Minuten OBSERVE gegen das oeffentliche Mainnet-RPC eingesammelt und persistiert; Cursor laeuft, Backoff faengt HTTP 429 ab. **Aber:** der Poller faellt hinter die Kette zurueck (Befund 2). Kein Dauerbetrieb ueber Stunden. WebSocket bewusst nicht gebaut. |
 | B3 Decoder | **teilweise** | Gegen echte Mainnet-Transaktionen und gegen das programmeigene Pump.fun-`TradeEvent` verifiziert. Blockiert durch CCR-001. |
 | B4 Signal-/Kopierlogik | abgenommen | `tests/paper/test_policy_and_broker.py` – jeder `NO_TRADE`-Grund einzeln |
 | B5 Persistenter Zustand | abgenommen | Alembic-Migration, partielle Unique-Indizes, Neustart-Test |
 | B6 Paper-Broker | abgenommen | End-to-End mit echter Transaktion, deterministische Landing-Simulation |
-| B7 Shadow-Modus | **Gerüst** | `ShadowBroker` inklusive Quote-Drift-Messung vorhanden, aber ohne verifizierten echten Quote-Provider wertlos |
-| B8 Execution-Adapter | **nur Interface** | Kein Anbieter festgelegt – §B8 verlangt Verifikation der offiziellen API zuerst |
+| B7 Shadow-Modus | **Gerüst, Provider jetzt verifiziert** | `ShadowBroker` mit Quote-Drift-Messung; der Jupiter-Provider antwortet nachweislich live (Befund 3). Noch kein Shadow-Lauf ueber laengere Zeit. |
+| B8 Execution-Adapter | **nur Interface** | Kein Anbieter festgelegt. Die von §B8 verlangte API-Verifikation ist fuer die **Quote**-Seite erbracht, fuer Build/Sign/Submit nicht. |
 | B9 Live-Gates | Preflight fertig, Live gesperrt | `assert_live_allowed()` wirft unbedingt |
 | B10 Reconciliation | abgenommen | `tests/execution/test_safety.py` |
 
-**186 Tests grün. `ruff check`, `ruff format --check` und `mypy --strict` grün.**
+**193 Tests gruen (plus 7 Integrationstests gegen die echte Jupiter-API). `ruff check`, `ruff format --check` und `mypy --strict` gruen.**
 
 ---
 
@@ -57,13 +57,77 @@ aktive Auswahl.
 
 | CCR | Betrifft | Wartet auf | Auswirkung, wenn ungelöst |
 |---|---|---|---|
-| **CCR-001** | S0 §5 Regel 9 (unbekanntes Programm → Quarantäne) | Stellungnahme A + Merge Mensch | **Blockierend.** Unter der Regel wie geschrieben erzeugt B aus 10 echten Mainnet-Transaktionen **0** verwertbare Events. Damit sind B3, I2 und I4 mit echten Daten nicht abnehmbar. |
+| **CCR-001** | S0 §5 Regel 9 (unbekanntes Programm → Quarantäne) | Stellungnahme A + Merge Mensch | **Blockierend.** Unter der Regel wie geschrieben erzeugt B aus 10 aufgezeichneten Mainnet-Transaktionen **0** verwertbare Events. Damit sind B3, I2 und I4 mit echten Daten nicht abnehmbar. |
 | CCR-002 | Felder in `CopyIntent` / `ExecutionResult` | Stellungnahme A | `attempt` und die Paper-Annahmen fehlen im geteilten Artefakt; A kann A10 nicht reproduzierbar rechnen. B führt sie bis dahin nur lokal. |
 | CCR-003 | `venue`-Enum (Multi-Venue-Routen, 4 fehlende Venues) | Stellungnahme A | Jupiter-Routen über mehrere Venues fallen auf `UNKNOWN` und sind nie verwertbar. Die Coverage-Metrik ist dadurch nicht interpretierbar. |
 
 ---
 
-## Was Plan A über mich wissen muss
+## Live-Befunde vom 2026-09-09
+
+Vier Minuten OBSERVE gegen das oeffentliche Mainnet-RPC, 178 echte Transaktionen. Drei
+Dinge kamen dabei heraus, die aus aufgezeichneten Fixtures nicht sichtbar waren.
+
+### 1. Der Fee-Payer ist haeufig nicht der Haendler - **das betrifft dich direkt**
+
+Ich hatte eine Watchlist aus Fee-Payern echter Swap-Transaktionen gebaut. Ergebnis nach
+178 Transaktionen: **null** SwapEvents. Nachgemessen an 40 Stichproben:
+
+| | Anzahl |
+|---|---|
+| Wallet ist Fee-Payer der Transaktion | 40 von 40 |
+| Transaktion enthaelt ein Swap-Venue-Programm | 40 von 40 |
+| **Tokenbestand der Wallet aendert sich** | **0 von 40** |
+| SOL-Sphaerenfluss der Wallet | exakt 0 Lamports |
+
+Die Adresse bezahlt fremde Trades. In denselben 40 Transaktionen stecken **14 Wallets, die
+tatsaechlich gehandelt haben** - sichtbar ausschliesslich daran, dass sich ihr Tokenbestand
+bewegt.
+
+**Konsequenz fuer A1/A2:** Wenn ihr Kandidaten ueber Fee-Payer oder `accountKeys[0]`
+gewinnt, analysiert ihr Relayer statt Haendler. Bei bot-vermittelten Transaktionen - und
+das ist auf Pump.fun der Normalfall - ist der Fee-Payer strukturell die falsche Adresse.
+Die Antwort darauf ist `wallets_that_traded()` in `src/stream/decoder.py`: Haendler ist,
+wem sich der Bestand bewegt. Der Decoder hat korrekt nichts erzeugt; der Fehler lag allein
+in der Wallet-Auswahl.
+
+### 2. Der Poller kommt auf dem oeffentlichen RPC nicht hinterher
+
+Blockzeit bis Empfang, 178 echte Beobachtungen:
+
+| Fenster | n | p50 | p90 | min |
+|---|---|---|---|---|
+| erste Minute | 60 | 50,7 s | 85,9 s | 15,2 s |
+| danach | 118 | **182,6 s** | 242,8 s | 95,3 s |
+
+Die Verzoegerung **waechst**, statt sich einzupendeln. Ursache: rund 1 von 3 RPC-Aufrufen
+wird mit HTTP 429 abgewiesen, und eine hochfrequente Wallet erzeugt mehr Transaktionen, als
+sich unter dieser Drosselung abholen lassen. Der Rueckstand laeuft davon.
+
+**Konsequenz fuer A8:** Deine Latenzszenarien sind 1/3/5/15/60 s. Keines davon deckt ab,
+was Plan B auf einem oeffentlichen RPC derzeit erreicht. Entweder kommt ein bezahlter
+Provider dazu, oder A8 braucht ein zusaetzliches Szenario in der Groessenordnung von
+Minuten - sonst rechnet der Backtest eine Ausfuehrungsqualitaet, die es nicht gibt.
+
+Ich habe daraufhin die Feed-Verzoegerung als Messgroesse verdrahtet und den
+`stale_feed`-Circuit-Breaker daran angeschlossen. Der existierte vorher, wurde aber von
+nichts gefuettert.
+
+### 3. Die Jupiter-Quote-API war auf einem toten Endpunkt verdrahtet
+
+`quote-api.jup.ag` loest nicht mehr auf. Live sind `lite-api.jup.ag/swap/v1` (ohne Key) und
+`api.jup.ag/swap/v1`. Zusaetzlich korrigiert: es gibt **kein 404** fuer ein nicht routbares
+Paar, sondern HTTP 400 mit maschinenlesbarem `errorCode` - mein 404-Zweig haette nie
+ausgeloest und jeder Fehlschlag waere als generischer Provider-Fehler fehlklassifiziert
+worden. Und `priceImpactPct` ist ein **Bruch**, kein Prozentwert: `"0.99"` heisst 99 %.
+
+Verifiziert in `tests/integration/test_jupiter_quotes.py`, 7 Tests gegen die echte API.
+Nicht verifiziert und deshalb nicht behauptet: Rate Limits, Nutzungsbedingungen, Eignung
+des Keyless-Tiers fuer Dauerbetrieb.
+
+---
+
+## Was Plan A ueber mich wissen muss
 
 1. **Die Selection unter `artifacts/selections/synthetic_dev.json` ist synthetisch.** Sie
    trägt `risks: ["NOT_A_RESEARCH_RESULT"]`. Sie existiert nur, damit der Pfad läuft.
